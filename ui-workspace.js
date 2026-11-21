@@ -461,6 +461,7 @@ export class ResourceHubWorkspace {
 
     render() {
         if (!this.root) return;
+        this.root.dataset.theme = this.store.getTheme();
         this.root.replaceChildren();
 
         const shell = createEl('div', 'trh-shell');
@@ -564,6 +565,18 @@ export class ResourceHubWorkspace {
         );
         checkAllBtn.addEventListener('click', () => this.checkAllBoundUpdates());
 
+        const isDark = this.store.getTheme() === 'dark';
+        const themeBtn = createEl('button', 'trh-btn trh-btn-icon');
+        themeBtn.type = 'button';
+        themeBtn.id = 'trh_theme_toggle_btn';
+        themeBtn.title = isDark ? '切换为浅色模式' : '切换为深色模式';
+        themeBtn.setAttribute('aria-label', isDark ? '切换为浅色模式' : '切换为深色模式');
+        themeBtn.append(createIcon(isDark ? 'fa-sun' : 'fa-moon'));
+        themeBtn.addEventListener('click', () => {
+            this.store.setTheme(isDark ? 'light' : 'dark');
+            this.render();
+        });
+
         const settingsBtn = createEl('button', `trh-btn trh-btn-icon ${this.showSettingsPopover ? 'is-active' : ''}`);
         settingsBtn.type = 'button';
         settingsBtn.title = 'GitHub 加速前缀与默认保护项设置';
@@ -584,7 +597,7 @@ export class ResourceHubWorkspace {
         );
         closeBtn.addEventListener('click', () => this.close());
 
-        actions.append(checkAllBtn, settingsBtn, closeBtn);
+        actions.append(checkAllBtn, themeBtn, settingsBtn, closeBtn);
         topbar.append(brandGroup, urlBar, actions);
 
         if (this.showSettingsPopover) {

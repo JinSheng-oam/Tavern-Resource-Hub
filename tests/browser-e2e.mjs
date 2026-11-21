@@ -540,7 +540,14 @@ try {
     const charCount = await evaluate(`document.querySelectorAll('.trh-char-card').length`);
     assert.equal(charCount, 3);
 
-    await captureScreenshot('trh-characters-desktop.png');
+    // 验证默认为浅色主题，并可切换深色主题后再切回浅色
+    assert.equal(await evaluate(`document.getElementById('tavern_resource_hub_overlay').dataset.theme`), 'light');
+    await captureScreenshot('trh-characters-light-desktop.png');
+    await evaluate(`document.getElementById('trh_theme_toggle_btn').click(); new Promise(r => setTimeout(r, 80))`);
+    assert.equal(await evaluate(`document.getElementById('tavern_resource_hub_overlay').dataset.theme`), 'dark');
+    await captureScreenshot('trh-characters-dark-desktop.png');
+    await evaluate(`document.getElementById('trh_theme_toggle_btn').click(); new Promise(r => setTimeout(r, 80))`);
+    assert.equal(await evaluate(`document.getElementById('tavern_resource_hub_overlay').dataset.theme`), 'light');
 
     // 3. 在顶部链接栏输入带中文说明的链接文本并解析，验证自动提取链接与原地更新预览
     await evaluate(`(async () => {

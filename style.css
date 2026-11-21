@@ -3,11 +3,41 @@
  * 独立全屏资源管理器样式表，全部选择器以 .trh- 命名空间严格隔离。
  */
 
-:root {
+:root,
+.trh-overlay[data-theme="light"] {
+    --trh-bg-obsidian: #F4F6FA;
+    --trh-bg-slate: #FFFFFF;
+    --trh-bg-elevated: #EDF0F6;
+    --trh-bg-hover: #E2E7F0;
+    --trh-toolbar-bg: rgba(255, 255, 255, 0.86);
+    --trh-portrait-bg: linear-gradient(145deg, #E8ECF4, #DDE3EE);
+    --trh-border: #DFE4EE;
+    --trh-border-strong: #C5CEDE;
+    --trh-text-primary: #161C28;
+    --trh-text-secondary: #4C576D;
+    --trh-text-muted: #768299;
+    --trh-accent-amber: #D97706;
+    --trh-accent-amber-soft: rgba(217, 119, 6, 0.12);
+    --trh-accent-btn-text: #FFFFFF;
+    --trh-accent-mint: #059669;
+    --trh-accent-mint-soft: rgba(5, 150, 105, 0.11);
+    --trh-badge-slate-bg: rgba(237, 240, 246, 0.94);
+    --trh-danger-text: #DC2626;
+    --trh-danger-text-hover: #B91C1C;
+    --trh-danger-bg: rgba(220, 38, 38, 0.08);
+    --trh-danger-bg-hover: rgba(220, 38, 38, 0.16);
+    --trh-danger-border: rgba(220, 38, 38, 0.35);
+    --trh-font-sans: 'Plus Jakarta Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+    --trh-font-mono: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+}
+
+.trh-overlay[data-theme="dark"] {
     --trh-bg-obsidian: #11141C;
     --trh-bg-slate: #191E2B;
     --trh-bg-elevated: #212838;
     --trh-bg-hover: #283145;
+    --trh-toolbar-bg: rgba(25, 30, 43, 0.45);
+    --trh-portrait-bg: linear-gradient(145deg, #1b2234, #121622);
     --trh-border: #283044;
     --trh-border-strong: #394561;
     --trh-text-primary: #ECF0F6;
@@ -15,10 +45,15 @@
     --trh-text-muted: #636D85;
     --trh-accent-amber: #F5A524;
     --trh-accent-amber-soft: rgba(245, 165, 36, 0.14);
+    --trh-accent-btn-text: #11141C;
     --trh-accent-mint: #38D399;
     --trh-accent-mint-soft: rgba(56, 211, 153, 0.14);
-    --trh-font-sans: 'Plus Jakarta Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
-    --trh-font-mono: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+    --trh-badge-slate-bg: rgba(25, 30, 43, 0.88);
+    --trh-danger-text: #fca5a5;
+    --trh-danger-text-hover: #fecaca;
+    --trh-danger-bg: rgba(239, 68, 68, 0.14);
+    --trh-danger-bg-hover: rgba(239, 68, 68, 0.28);
+    --trh-danger-border: rgba(239, 68, 68, 0.45);
 }
 
 /* =========================================================================
@@ -383,7 +418,7 @@
     gap: 12px;
     padding: 14px 22px;
     border-bottom: 1px solid var(--trh-border);
-    background: rgba(25, 30, 43, 0.45);
+    background: var(--trh-toolbar-bg);
 }
 
 .trh-search-box {
@@ -481,7 +516,7 @@
     position: relative;
     width: 100%;
     aspect-ratio: 4 / 3;
-    background: linear-gradient(145deg, #1b2234, #121622);
+    background: var(--trh-portrait-bg);
     overflow: hidden;
 }
 
@@ -915,7 +950,7 @@
 
 .trh-btn-accent {
     background: var(--trh-accent-amber);
-    color: #11141C;
+    color: var(--trh-accent-btn-text);
 }
 
 .trh-btn-accent:hover:not(:disabled) {
@@ -944,18 +979,18 @@
 }
 
 .trh-btn-danger {
-    background: rgba(239, 68, 68, 0.14);
-    border-color: rgba(239, 68, 68, 0.45);
-    color: #fca5a5;
+    background: var(--trh-danger-bg);
+    border-color: var(--trh-danger-border);
+    color: var(--trh-danger-text);
 }
 
 .trh-btn-danger:hover:not(:disabled) {
-    background: rgba(239, 68, 68, 0.28);
-    color: #fecaca;
+    background: var(--trh-danger-bg-hover);
+    color: var(--trh-danger-text-hover);
 }
 
 .trh-danger-zone {
-    border-color: rgba(239, 68, 68, 0.25);
+    border-color: var(--trh-danger-border);
 }
 
 .trh-danger-row {
@@ -975,7 +1010,7 @@
 .trh-delete-confirm-title {
     font-size: 13px;
     font-weight: 650;
-    color: #fca5a5;
+    color: var(--trh-danger-text);
 }
 
 .trh-delete-confirm-hint {
@@ -996,6 +1031,12 @@
 .trh-btn-icon:hover {
     color: var(--trh-text-primary);
     border-color: var(--trh-border-strong);
+}
+
+@media (min-width: 781px) {
+    .trh-mobile-sheet-close {
+        display: none;
+    }
 }
 
 .trh-input,
@@ -1058,7 +1099,7 @@
 }
 
 .trh-badge-slate {
-    background: rgba(25, 30, 43, 0.88);
+    background: var(--trh-badge-slate-bg);
     color: var(--trh-text-secondary);
     border: 1px solid var(--trh-border-strong);
 }

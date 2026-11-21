@@ -28,6 +28,7 @@ export const DEFAULT_PRESERVE_OPTIONS = {
 
 export const DEFAULT_SETTINGS = {
     schemaVersion: 1,
+    theme: 'light',
     githubMirrorPrefix: '',
     preserveDefaults: structuredClone(DEFAULT_PRESERVE_OPTIONS),
     bindings: {
@@ -112,6 +113,10 @@ export class BindingStore {
     _normalizeState(raw) {
         const base = structuredClone(DEFAULT_SETTINGS);
         if (!isPlainObject(raw)) return base;
+
+        if (raw.theme === 'dark' || raw.theme === 'light') {
+            base.theme = raw.theme;
+        }
 
         if (typeof raw.githubMirrorPrefix === 'string') {
             base.githubMirrorPrefix = raw.githubMirrorPrefix.trim();
@@ -312,6 +317,16 @@ export class BindingStore {
     setGithubMirrorPrefix(prefix) {
         this.state.githubMirrorPrefix = String(prefix || '').trim();
         this.save();
+    }
+
+    getTheme() {
+        return this.state.theme === 'dark' ? 'dark' : 'light';
+    }
+
+    setTheme(theme) {
+        this.state.theme = theme === 'dark' ? 'dark' : 'light';
+        this.save();
+        return this.state.theme;
     }
 
     /**

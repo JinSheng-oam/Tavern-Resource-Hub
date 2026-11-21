@@ -4,6 +4,8 @@
  */
 
 import {
+    isPngBytes,
+    parsePngCharacterCard,
     encodePngCharacterCard,
     normalizeCharacterPayload,
     normalizeWorldbookPayload,
@@ -159,9 +161,9 @@ export class PlatformAdapter {
     }
 
     /**
-     * 根据 avatarId（或角色名）查找并读取完整角色卡对象（自动执行 unshallow）
+     * 根据 avatarId（或角色名）查找并读取完整角色卡对象（自动执行 unshallow / API / PNG 回退补全）
      */
-    static async getCharacterFullData(context, avatarOrName) {
+    static async getCharacterFullData(context, avatarOrName, { fetchImpl = globalThis.fetch } = {}) {
         if (!context || !Array.isArray(context.characters)) {
             throw new Error('宿主角色列表未就绪');
         }
@@ -175,15 +177,69 @@ export class PlatformAdapter {
         }
 
         if (context.characters[chid]?.shallow && typeof context.unshallowCharacter === 'function') {
-            await context.unshallowCharacter(String(chid));
+            try {
+                await context.unshallowCharacter(String(chid));
+            } catch {
+                // Continue to API/PNG fallback
+            }
         }
 
-        const charObj = context.characters[chid];
+        let charObj = structuredClone(context.characters[chid]);
+        const hasCoreText = Boolean(
+            charObj.description ||
+            charObj.first_mes ||
+            charObj.data?.description ||
+            charObj.data?.first_mes ||
+            (typeof charObj.json_data === 'string' && charObj.json_data.trim().startsWith('{'))
+        );
+
+        // 若内存对象仍为浅层摘要，尝试通过宿主 /api/characters/get 补全
+        if ((!hasCoreText || charObj.shallow) && typeof fetchImpl === 'function' && charObj.avatar) {
+            try {
+                const res = await fetchImpl('/api/characters/get', {
+                    method: 'POST',
+                    headers: PlatformAdapter.getHeaders(context),
+                    body: JSON.stringify({ avatar_url: charObj.avatar }),
+                });
+                if (res.ok) {
+                    const remoteChar = await res.json();
+                    if (remoteChar && typeof remoteChar === 'object') {
+                        charObj = { ...charObj, ...remoteChar, shallow: false };
+                    }
+                }
+            } catch {
+                // Try PNG chunk fallback next
+            }
+        }
+
+        // 若依然缺失正文，尝试直接读取角色卡 PNG 文件内嵌的 chara/ccv3 元数据
+        const stillMissing = !charObj.description && !charObj.first_mes && !charObj.data?.description && !charObj.data?.first_mes;
+        if (stillMissing && typeof fetchImpl === 'function' && charObj.avatar && String(charObj.avatar).toLowerCase().endsWith('.png')) {
+            try {
+                const imgRes = await fetchImpl(`/characters/${encodeURIComponent(charObj.avatar)}`, { method: 'GET' });
+                if (imgRes.ok) {
+                    const ab = await imgRes.arrayBuffer();
+                    const u8 = new Uint8Array(ab);
+                    if (isPngBytes(u8)) {
+                        const parsed = await parsePngCharacterCard(u8);
+                        charObj = {
+                            ...parsed.normalized.v2Object,
+                            ...charObj,
+                            data: parsed.normalized.v2Object.data,
+                            shallow: false,
+                        };
+                    }
+                }
+            } catch {
+                // Keep available fields
+            }
+        }
+
         const worldbooks = PlatformAdapter.getCharacterWorldbookBindings(context, charObj);
         return {
             chid,
             avatarId: charObj.avatar,
-            charObj: structuredClone(charObj),
+            charObj,
             worldbooks,
         };
     }

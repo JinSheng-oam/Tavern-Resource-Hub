@@ -298,6 +298,26 @@ export function encodePngCharacterCard(pngInput, v2CardObject) {
     return output;
 }
 
+function pickNonEmptyText(...candidates) {
+    for (const val of candidates) {
+        if (typeof val === 'string' && val.length > 0) return val;
+    }
+    for (const val of candidates) {
+        if (val !== undefined && val !== null) return String(val);
+    }
+    return '';
+}
+
+function pickNonEmptyArray(...candidates) {
+    for (const arr of candidates) {
+        if (Array.isArray(arr) && arr.length > 0) return [...arr];
+    }
+    for (const arr of candidates) {
+        if (Array.isArray(arr)) return [...arr];
+    }
+    return [];
+}
+
 /**
  * 规范化 V1 / V2 / V3 角色卡 JSON，提取统一的顶层与 data 字段，同时完整保留未知的 extensions
  * @param {Object} raw
@@ -307,36 +327,67 @@ export function normalizeCharacterPayload(raw) {
         throw new Error('角色卡数据不是有效的 JSON 对象');
     }
 
+    // 兼容 SillyTavern v1CharData 中的 json_data 字符串（浅层对象常把完整 V2/V3 JSON 放在此处）
+    let embeddedRaw = null;
+    if (typeof raw.json_data === 'string' && raw.json_data.trim().startsWith('{')) {
+        try {
+            const parsed = JSON.parse(raw.json_data);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                embeddedRaw = parsed;
+            }
+        } catch {
+            // Ignore malformed json_data
+        }
+    }
+
     const d = (raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data)) ? raw.data : {};
+    const ed = (embeddedRaw?.data && typeof embeddedRaw.data === 'object' && !Array.isArray(embeddedRaw.data))
+        ? embeddedRaw.data
+        : {};
+
     const ext = {
+        ...(embeddedRaw?.extensions && typeof embeddedRaw.extensions === 'object' ? structuredClone(embeddedRaw.extensions) : {}),
+        ...(ed.extensions && typeof ed.extensions === 'object' ? structuredClone(ed.extensions) : {}),
         ...(raw.extensions && typeof raw.extensions === 'object' ? structuredClone(raw.extensions) : {}),
         ...(d.extensions && typeof d.extensions === 'object' ? structuredClone(d.extensions) : {}),
     };
 
-    const name = String(d.name ?? raw.name ?? raw.ch_name ?? '').trim();
+    const name = pickNonEmptyText(d.name, raw.name, raw.ch_name, ed.name, embeddedRaw?.name).trim();
     if (!name) {
         throw new Error('角色卡缺少有效的角色名称 (name)');
     }
 
-    const description = String(d.description ?? raw.description ?? '');
-    const personality = String(d.personality ?? raw.personality ?? '');
-    const scenario = String(d.scenario ?? raw.scenario ?? '');
-    const first_mes = String(d.first_mes ?? raw.first_mes ?? '');
-    const mes_example = String(d.mes_example ?? raw.mes_example ?? '');
-    const creator_notes = String(d.creator_notes ?? raw.creatorcomment ?? raw.creator_notes ?? '');
-    const system_prompt = String(d.system_prompt ?? raw.system_prompt ?? '');
-    const post_history_instructions = String(d.post_history_instructions ?? raw.post_history_instructions ?? '');
-    const creator = String(d.creator ?? raw.creator ?? '');
-    const character_version = String(d.character_version ?? raw.character_version ?? '');
-    const alternate_greetings = Array.isArray(d.alternate_greetings)
-        ? [...d.alternate_greetings]
-        : (Array.isArray(raw.alternate_greetings) ? [...raw.alternate_greetings] : []);
-    const tags = Array.isArray(d.tags)
-        ? [...d.tags]
-        : (Array.isArray(raw.tags) ? [...raw.tags] : []);
+    const description = pickNonEmptyText(d.description, raw.description, ed.description, embeddedRaw?.description);
+    const personality = pickNonEmptyText(d.personality, raw.personality, ed.personality, embeddedRaw?.personality);
+    const scenario = pickNonEmptyText(d.scenario, raw.scenario, ed.scenario, embeddedRaw?.scenario);
+    const first_mes = pickNonEmptyText(d.first_mes, raw.first_mes, ed.first_mes, embeddedRaw?.first_mes);
+    const mes_example = pickNonEmptyText(d.mes_example, raw.mes_example, ed.mes_example, embeddedRaw?.mes_example);
+    const creator_notes = pickNonEmptyText(
+        d.creator_notes,
+        raw.creatorcomment,
+        raw.creator_notes,
+        ed.creator_notes,
+        embeddedRaw?.creatorcomment,
+        embeddedRaw?.creator_notes
+    );
+    const system_prompt = pickNonEmptyText(d.system_prompt, raw.system_prompt, ed.system_prompt, embeddedRaw?.system_prompt);
+    const post_history_instructions = pickNonEmptyText(
+        d.post_history_instructions,
+        raw.post_history_instructions,
+        ed.post_history_instructions,
+        embeddedRaw?.post_history_instructions
+    );
+    const creator = pickNonEmptyText(d.creator, raw.creator, ed.creator, embeddedRaw?.creator);
+    const character_version = pickNonEmptyText(d.character_version, raw.character_version, ed.character_version, embeddedRaw?.character_version);
+    const alternate_greetings = pickNonEmptyArray(d.alternate_greetings, raw.alternate_greetings, ed.alternate_greetings, embeddedRaw?.alternate_greetings);
+    const tags = pickNonEmptyArray(d.tags, raw.tags, ed.tags, embeddedRaw?.tags);
     const character_book = (d.character_book && typeof d.character_book === 'object')
         ? structuredClone(d.character_book)
-        : ((raw.character_book && typeof raw.character_book === 'object') ? structuredClone(raw.character_book) : null);
+        : ((raw.character_book && typeof raw.character_book === 'object')
+            ? structuredClone(raw.character_book)
+            : ((ed.character_book && typeof ed.character_book === 'object')
+                ? structuredClone(ed.character_book)
+                : ((embeddedRaw?.character_book && typeof embeddedRaw.character_book === 'object') ? structuredClone(embeddedRaw.character_book) : null)));
 
     const talkativeness = Number.isFinite(Number(ext.talkativeness ?? raw.talkativeness))
         ? Number(ext.talkativeness ?? raw.talkativeness)

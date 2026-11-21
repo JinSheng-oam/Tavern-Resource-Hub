@@ -92,3 +92,30 @@ test('normalizeWorldbookPayload converts both Character Book array format and ST
     assert.equal(norm.entries['10'].disable, false);
     assert.equal(norm.entries['11'].disable, true);
 });
+
+test('normalizeCharacterPayload extracts fields from embedded json_data string when top-level or data fields are empty', () => {
+    const shallowChar = {
+        name: '浅层角色',
+        avatar: 'Shallow.png',
+        shallow: true,
+        description: '',
+        first_mes: '',
+        data: {},
+        json_data: JSON.stringify({
+            spec: 'chara_card_v2',
+            data: {
+                name: '浅层角色',
+                description: '来自 json_data 的完整角色描述',
+                first_mes: '来自 json_data 的开场白',
+                character_version: '3.2.1',
+                alternate_greetings: ['备用开场白A'],
+            },
+        }),
+    };
+
+    const norm = normalizeCharacterPayload(shallowChar);
+    assert.equal(norm.description, '来自 json_data 的完整角色描述');
+    assert.equal(norm.first_mes, '来自 json_data 的开场白');
+    assert.equal(norm.version, '3.2.1');
+    assert.deepEqual(norm.alternate_greetings, ['备用开场白A']);
+});

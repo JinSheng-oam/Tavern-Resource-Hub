@@ -122,7 +122,7 @@ export class ResourceDataEditor {
         const context = this.getContext?.();
         let rawData;
         if (type === 'character') {
-            const full = await PlatformAdapter.getCharacterFullData(context, id);
+            const full = await PlatformAdapter.getCharacterFullData(context, id, { fetchImpl: this.fetchImpl });
             rawData = normalizeCharacterPayload(full.charObj).v2Object;
             rawData.avatar = full.avatarId;
             rawData.chat = full.charObj.chat || '';

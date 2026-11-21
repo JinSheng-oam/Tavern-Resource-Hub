@@ -1,0 +1,12 @@
+node_modules/
+.preview/
+test-results/
+*.log
+
+# 内部开发与设计文档仅本地保留，禁止上传 GitHub
+docs/
+PRODUCT.md
+DESIGN.md
+.impeccable/
+artifacts/
+参考文件和文档/

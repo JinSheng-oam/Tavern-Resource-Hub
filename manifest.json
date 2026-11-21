@@ -1,0 +1,19 @@
+{
+  "name": "Tavern Resource Hub",
+  "display_name": "典藏工坊 · 资源管理器 (预设·角色卡·世界书)",
+  "author": "Jin",
+  "version": "1.0.0",
+  "loading_order": 15,
+  "requires": [],
+  "optional": [],
+  "dependencies": [],
+  "description": "集成预设、角色卡、世界书为一体的独立全屏管理器，支持链接绑定、GitHub 自动转 Raw 与原地无损更新。",
+  "js": "index.js",
+  "css": "style.css",
+  "homePage": "https://github.com/JinSheng-oam/Tavern-Resource-Hub",
+  "hooks": {
+    "activate": "activate",
+    "enable": "activate",
+    "disable": "dispose"
+  }
+}

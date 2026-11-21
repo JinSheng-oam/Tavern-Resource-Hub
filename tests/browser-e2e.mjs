@@ -635,10 +635,13 @@ try {
     await evaluate(`document.querySelector('.trh-nav-item[data-tab="preset"]').click(); new Promise(r => setTimeout(r, 120))`);
     await captureScreenshot('trh-presets-mobile.png');
 
-    // 在手机端打开预设内部编辑器并抓拍截图验证布局
+    // 在手机端打开预设内部编辑器，验证底部分页切换与截图布局
     await evaluate(`document.querySelector('.trh-resource-row').click(); new Promise(r => setTimeout(r, 80))`);
     await evaluate(`document.getElementById('trh_open_editor_btn').click(); new Promise(r => setTimeout(r, 120))`);
     assert.equal(await evaluate(`document.documentElement.scrollWidth <= window.innerWidth`), true);
+    assert.equal(await evaluate(`document.querySelectorAll('.trh-editor-tab-btn').length`), 4);
+    await captureScreenshot('trh-editor-mobile-list.png');
+    await evaluate(`document.querySelector('.trh-editor-tab-btn[data-page="item"]').click(); new Promise(r => setTimeout(r, 100))`);
     await captureScreenshot('trh-editor-mobile.png');
     await evaluate(`document.querySelector('#trh_data_editor_modal .trh-editor-header .trh-btn-icon').click(); new Promise(r => setTimeout(r, 80))`);
     await evaluate(`document.querySelector('.trh-mobile-sheet-close')?.click(); new Promise(r => setTimeout(r, 80))`);

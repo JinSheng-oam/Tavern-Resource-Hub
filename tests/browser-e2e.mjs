@@ -542,10 +542,10 @@ try {
 
     await captureScreenshot('trh-characters-desktop.png');
 
-    // 3. 在顶部链接栏输入更新链接并解析，验证右侧原地更新预览与保护项抽屉
+    // 3. 在顶部链接栏输入带中文说明的链接文本并解析，验证自动提取链接与原地更新预览
     await evaluate(`(async () => {
         const input = document.getElementById('trh_global_url_input');
-        input.value = location.origin + '/remote/HoshinoYume_v2.4.png';
+        input.value = '【角色卡更新】星野梦 v2.4 下载地址：' + location.origin + '/remote/HoshinoYume_v2.4.png（带内置世界书与助手脚本）';
         document.getElementById('trh_global_probe_btn').click();
         for (let i = 0; i < 50; i++) {
             if (document.getElementById('trh_confirm_staged_update_btn')) break;
@@ -627,7 +627,26 @@ try {
     await evaluate(`document.querySelector('.trh-nav-item[data-tab="preset"]').click(); new Promise(r => setTimeout(r, 120))`);
     await captureScreenshot('trh-presets-mobile.png');
 
-    // 6. 验证 dispose 生命周期完整清理
+    // 6. 验证删除功能：在桌面视图选中第三张角色卡“苏沐晴”并点击删除 -> 确认删除
+    await cdp('Emulation.setDeviceMetricsOverride', {
+        width: 1366,
+        height: 860,
+        deviceScaleFactor: 1,
+        mobile: false,
+    }, sessionId);
+    await evaluate(`document.querySelector('.trh-nav-item[data-tab="character"]').click(); new Promise(r => setTimeout(r, 100))`);
+    await evaluate(`document.querySelector('.trh-char-card[data-id="SuMuqing.png"]').click(); new Promise(r => setTimeout(r, 80))`);
+    await evaluate(`document.getElementById('trh_delete_resource_btn').click(); new Promise(r => setTimeout(r, 80))`);
+    await evaluate(`(async () => {
+        document.getElementById('trh_confirm_delete_btn').click();
+        for (let i = 0; i < 40; i++) {
+            if (document.querySelectorAll('.trh-char-card').length === 2) break;
+            await new Promise(r => setTimeout(r, 40));
+        }
+    })()`);
+    assert.equal(await evaluate(`document.querySelectorAll('.trh-char-card').length`), 2, '确认删除后角色卡数量减少为 2');
+
+    // 7. 验证 dispose 生命周期完整清理
     await evaluate(`window.trhDispose()`);
     const cleaned = await evaluate(`[
         Boolean(document.getElementById('tavern_resource_hub_overlay')),

@@ -14,17 +14,59 @@ import {
 import { canonicalStringify, sha256Hex } from './binding-store.js';
 
 /**
- * 将用户粘贴的链接规范化为可直接下载的 Raw 链接
+ * 从可能包含中文说明、换行或 Markdown 标记的混合文本中提取第一个 HTTP/HTTPS 链接
+ * @param {string} rawInput
+ * @returns {string}
+ */
+export function extractResourceUrl(rawInput) {
+    const text = String(rawInput || '').trim();
+    if (!text) {
+        throw new Error('请输入有效的 HTTP / HTTPS 资源链接');
+    }
+
+    // 显式拒绝非 HTTP(S) 危险协议（如 javascript: / file:）
+    if (/^(javascript|data|vbscript|file):/i.test(text)) {
+        const proto = text.split(':')[0] + ':';
+        throw new Error(`仅支持 HTTP / HTTPS 链接，已拒绝协议: ${proto}`);
+    }
+
+    // 匹配 https:// 或 http://，在遇到空白、中文/全角字符或引号/尖括号时停止
+    const match = text.match(/https?:\/\/[^\s\u4e00-\u9fff\u3000-\u303f\uff00-\uffef"'<>]+/i);
+    if (!match) {
+        throw new Error('未在输入内容中检测到有效的 HTTP / HTTPS 链接');
+    }
+
+    let extracted = match[0];
+    // 剥离链接末尾可能紧跟的英文标点或未配对的右括号（如 Markdown `[名称](url)` 或句末标点）
+    while (extracted.length > 8) {
+        const lastChar = extracted.at(-1);
+        if (lastChar === '.' || lastChar === ',' || lastChar === ';' || lastChar === ':' || lastChar === '!' || lastChar === '?' || lastChar === ']') {
+            extracted = extracted.slice(0, -1);
+            continue;
+        }
+        if (lastChar === ')') {
+            const openCount = (extracted.match(/\(/g) || []).length;
+            const closeCount = (extracted.match(/\)/g) || []).length;
+            if (closeCount > openCount) {
+                extracted = extracted.slice(0, -1);
+                continue;
+            }
+        }
+        break;
+    }
+
+    return extracted;
+}
+
+/**
+ * 将用户粘贴的链接（支持带中文说明的文本）规范化为可直接下载的 Raw 链接
  * @param {string} rawUrl
  * @param {Object} [options]
  * @param {string} [options.githubMirrorPrefix=''] 可选 GitHub 加速前缀（例如 https://ghfast.top/）
  * @returns {{ originalUrl: string, resolvedUrl: string, displayHost: string, suggestedFilename: string, transformed: boolean }}
  */
 export function normalizeResourceUrl(rawUrl, { githubMirrorPrefix = '' } = {}) {
-    const trimmed = String(rawUrl || '').trim();
-    if (!trimmed) {
-        throw new Error('请输入有效的 HTTP / HTTPS 资源链接');
-    }
+    const trimmed = extractResourceUrl(rawUrl);
 
     let parsed;
     try {

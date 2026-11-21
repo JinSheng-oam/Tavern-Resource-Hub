@@ -311,3 +311,24 @@ test('PlatformAdapter.listWorldbooks supports TauriTavern /api/settings/get worl
         globalThis.window = prevTauriFlag;
     }
 });
+
+test('PlatformAdapter.deleteResource deletes characters, presets, and worldbooks and cleans host state', async () => {
+    const context = createMockHostContext();
+    const apiCalls = [];
+    const mockFetch = async (url, init) => {
+        apiCalls.push({ url, body: JSON.parse(init.body) });
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    };
+
+    await PlatformAdapter.deleteResource(context, 'character', 'Alice.png', { deleteChats: true, fetchImpl: mockFetch });
+    assert.equal(context.characters.length, 0);
+    assert.deepEqual(apiCalls[0], { url: '/api/characters/delete', body: { avatar_url: 'Alice.png', delete_chats: true } });
+
+    await PlatformAdapter.deleteResource(context, 'preset', '日常写作预设', { fetchImpl: mockFetch });
+    assert.equal('日常写作预设' in context.presets, false);
+    assert.deepEqual(apiCalls[1], { url: '/api/presets/delete', body: { name: '日常写作预设', apiId: 'openai' } });
+
+    await PlatformAdapter.deleteResource(context, 'worldbook', '用户本地绑定的主世界书', { fetchImpl: mockFetch });
+    assert.equal('用户本地绑定的主世界书' in context.worldbooks, false);
+    assert.deepEqual(apiCalls[2], { url: '/api/worldinfo/delete', body: { name: '用户本地绑定的主世界书' } });
+});

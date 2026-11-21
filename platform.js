@@ -932,4 +932,178 @@ export class PlatformAdapter {
             additional: Array.isArray(additional) ? additional : [],
         };
     }
+
+    // =========================================================================
+    // 4. 资源删除 (角色卡 / 预设 / 世界书)
+    // =========================================================================
+
+    static async deleteCharacter(context, avatarId, { deleteChats = false, fetchImpl = globalThis.fetch } = {}) {
+        const cleanId = String(avatarId || '').trim();
+        if (!cleanId) throw new Error('角色卡标识不能为空');
+
+        const helper = globalThis.TavernHelper;
+        let deletedViaHelper = false;
+        if (helper && typeof helper.deleteCharacter === 'function') {
+            try {
+                const ok = await helper.deleteCharacter(cleanId, { delete_chats: Boolean(deleteChats) });
+                if (ok !== false) deletedViaHelper = true;
+            } catch {
+                // Fall back to native API
+            }
+        }
+
+        let deletedViaApi = false;
+        if (!deletedViaHelper && typeof fetchImpl === 'function') {
+            try {
+                const res = await fetchImpl('/api/characters/delete', {
+                    method: 'POST',
+                    headers: PlatformAdapter.getHeaders(context),
+                    body: JSON.stringify({
+                        avatar_url: cleanId,
+                        delete_chats: Boolean(deleteChats),
+                    }),
+                });
+                if (!res.ok) {
+                    throw new Error(`删除角色卡失败: HTTP ${res.status}`);
+                }
+                deletedViaApi = true;
+            } catch (err) {
+                if (!Array.isArray(context?.characters)) throw err;
+                // 若在无真实后端的模拟上下文中，继续清理内存数组
+                if (String(err.message || '').includes('HTTP ')) throw err;
+            }
+        }
+
+        if (Array.isArray(context?.characters)) {
+            const idx = context.characters.findIndex(c => c && c.avatar === cleanId);
+            if (idx !== -1) {
+                context.characters.splice(idx, 1);
+            }
+        }
+
+        if (deletedViaApi && typeof context?.getCharacters === 'function') {
+            try {
+                await context.getCharacters();
+            } catch {
+                // Ignore refresh failure
+            }
+        }
+
+        return { ok: true, type: 'character', id: cleanId };
+    }
+
+    static async deletePreset(context, presetName, { fetchImpl = globalThis.fetch } = {}) {
+        const cleanName = String(presetName || '').trim();
+        if (!cleanName) throw new Error('预设名称不能为空');
+
+        const helper = globalThis.TavernHelper;
+        let deletedViaHelper = false;
+        if (helper && typeof helper.deletePreset === 'function') {
+            try {
+                const ok = await helper.deletePreset(cleanName);
+                if (ok !== false) deletedViaHelper = true;
+            } catch {
+                // Fall back to native API
+            }
+        }
+
+        if (!deletedViaHelper && typeof fetchImpl === 'function') {
+            try {
+                const res = await fetchImpl('/api/presets/delete', {
+                    method: 'POST',
+                    headers: PlatformAdapter.getHeaders(context),
+                    body: JSON.stringify({
+                        name: cleanName,
+                        apiId: 'openai',
+                    }),
+                });
+                if (!res.ok) {
+                    throw new Error(`删除预设失败: HTTP ${res.status}`);
+                }
+            } catch (err) {
+                if (String(err.message || '').includes('HTTP ')) throw err;
+            }
+        }
+
+        if (context?.presets && typeof context.presets === 'object') {
+            delete context.presets[cleanName];
+        }
+
+        if (globalThis.openai_setting_names && Object.hasOwn(globalThis.openai_setting_names, cleanName)) {
+            const idx = globalThis.openai_setting_names[cleanName];
+            delete globalThis.openai_setting_names[cleanName];
+            if (Array.isArray(globalThis.openai_settings)) {
+                globalThis.openai_settings[idx] = undefined;
+            }
+        }
+
+        const pm = context?.getPresetManager?.('openai');
+        if (pm && typeof pm.deletePreset === 'function' && !deletedViaHelper) {
+            try {
+                await pm.deletePreset(cleanName);
+            } catch {
+                // Ignore manager sync error if API already succeeded
+            }
+        }
+
+        return { ok: true, type: 'preset', id: cleanName };
+    }
+
+    static async deleteWorldbook(context, worldName, { fetchImpl = globalThis.fetch } = {}) {
+        const cleanName = String(worldName || '').trim();
+        if (!cleanName) throw new Error('世界书名称不能为空');
+
+        const helper = globalThis.TavernHelper;
+        let deletedViaHelper = false;
+        if (helper && typeof helper.deleteWorldbook === 'function') {
+            try {
+                const ok = await helper.deleteWorldbook(cleanName);
+                if (ok !== false) deletedViaHelper = true;
+            } catch {
+                // Fall back to native API
+            }
+        }
+
+        if (!deletedViaHelper && typeof fetchImpl === 'function') {
+            try {
+                const res = await fetchImpl('/api/worldinfo/delete', {
+                    method: 'POST',
+                    headers: PlatformAdapter.getHeaders(context),
+                    body: JSON.stringify({ name: cleanName }),
+                });
+                if (!res.ok) {
+                    throw new Error(`删除世界书失败: HTTP ${res.status}`);
+                }
+            } catch (err) {
+                if (String(err.message || '').includes('HTTP ')) throw err;
+            }
+        }
+
+        if (context?.worldbooks && typeof context.worldbooks === 'object') {
+            delete context.worldbooks[cleanName];
+        }
+
+        // 若该世界书当前在全局启用列表里，一并取消
+        const globalActive = PlatformAdapter.getGlobalWorldbooks(context);
+        if (globalActive.includes(cleanName)) {
+            await PlatformAdapter.toggleGlobalWorldbook(context, cleanName, false);
+        }
+
+        await context?.updateWorldInfoList?.();
+
+        return { ok: true, type: 'worldbook', id: cleanName };
+    }
+
+    static async deleteResource(context, type, id, options = {}) {
+        if (type === 'character') {
+            return PlatformAdapter.deleteCharacter(context, id, options);
+        }
+        if (type === 'preset') {
+            return PlatformAdapter.deletePreset(context, id, options);
+        }
+        if (type === 'worldbook') {
+            return PlatformAdapter.deleteWorldbook(context, id, options);
+        }
+        throw new Error(`不支持删除的资源类型: ${type}`);
+    }
 }

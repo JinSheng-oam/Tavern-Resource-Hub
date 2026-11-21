@@ -4,7 +4,7 @@
  */
 
 import { PlatformAdapter } from './platform.js';
-import { normalizeResourceUrl, inspectResourceBytes, fetchAndInspectUrl } from './url-resolver.js';
+import { extractResourceUrl, normalizeResourceUrl, inspectResourceBytes, fetchAndInspectUrl } from './url-resolver.js';
 import { UpdateEngine } from './update-engine.js';
 import { normalizeCharacterPayload } from './card-codec.js';
 
@@ -80,6 +80,7 @@ export class ResourceHubWorkspace {
 
         this.selected = null; // { type: 'character'|'preset'|'worldbook', id: string }
         this.stagedUpdate = null; // { inspection, targetType, targetId, mode: 'inplace'|'create', preview, options }
+        this.pendingDelete = null; // { type, id, deleteChats }
         this.mobileInspectorOpen = false;
         this.isBusy = false;
         this.showSettingsPopover = false;
@@ -207,6 +208,7 @@ export class ResourceHubWorkspace {
                 fetchImpl: this.fetchImpl,
             });
             await this._stageInspection(inspection, preferredTarget);
+            this.pendingDelete = null;
             this.notify('info', `已解析 ${TYPE_LABELS[inspection.type]}: ${inspection.name}`);
         } catch (err) {
             this.notify('error', err.message);
@@ -504,9 +506,10 @@ export class ResourceHubWorkspace {
         const urlIcon = createIcon('fa-link');
         urlIcon.classList.add('trh-url-bar-icon');
         const urlInput = createEl('input', 'trh-url-input');
-        urlInput.type = 'url';
+        urlInput.type = 'text';
+        urlInput.inputMode = 'url';
         urlInput.id = 'trh_global_url_input';
-        urlInput.placeholder = '输入或粘贴角色卡 (.png/.json)、预设或世界书链接（支持 GitHub 自动转 Raw）...';
+        urlInput.placeholder = '粘贴资源链接（支持带中文说明自动提取链接，GitHub 自动转 Raw）...';
         if (this.stagedUpdate?.inspection?.sourceUrl) {
             urlInput.value = this.stagedUpdate.inspection.sourceUrl;
         }
@@ -1082,9 +1085,10 @@ export class ResourceHubWorkspace {
         urlHead.append(createIcon('fa-link'), createEl('h3', '', '更新源链接绑定 (支持直链与 GitHub)'));
 
         const urlInput = createEl('input', 'trh-input');
-        urlInput.type = 'url';
+        urlInput.type = 'text';
+        urlInput.inputMode = 'url';
         urlInput.id = 'trh_inspector_url_input';
-        urlInput.placeholder = `输入该${TYPE_LABELS[type]}的直链或 GitHub 链接...`;
+        urlInput.placeholder = `粘贴该${TYPE_LABELS[type]}的链接（支持带中文说明自动提取）...`;
         urlInput.value = binding?.sourceUrl || '';
 
         const btnRow = createEl('div', 'trh-btn-row');
@@ -1099,8 +1103,10 @@ export class ResourceHubWorkspace {
                 return;
             }
             try {
-                normalizeResourceUrl(val, { githubMirrorPrefix: this.store.state.githubMirrorPrefix });
-                this.store.setBinding(type, id, { sourceUrl: val });
+                const extractedUrl = extractResourceUrl(val);
+                normalizeResourceUrl(extractedUrl, { githubMirrorPrefix: this.store.state.githubMirrorPrefix });
+                urlInput.value = extractedUrl;
+                this.store.setBinding(type, id, { sourceUrl: extractedUrl });
                 this.notify('success', `已为 [${item.name}] 绑定更新源链接`);
                 this.render();
             } catch (err) {
@@ -1118,8 +1124,14 @@ export class ResourceHubWorkspace {
                 this.notify('warning', '请先在上方输入框填入更新链接');
                 return;
             }
-            this.store.setBinding(type, id, { sourceUrl: val });
-            this.probeUrlForUpdate(val, { type, id });
+            try {
+                const extractedUrl = extractResourceUrl(val);
+                urlInput.value = extractedUrl;
+                this.store.setBinding(type, id, { sourceUrl: extractedUrl });
+                this.probeUrlForUpdate(extractedUrl, { type, id });
+            } catch (err) {
+                this.notify('error', err.message);
+            }
         });
 
         btnRow.append(saveBindBtn, pullNowBtn);
@@ -1144,7 +1156,99 @@ export class ResourceHubWorkspace {
             drawer.append(this._renderWorldbookDetailsSection(item));
         }
 
+        // 4. 危险操作区（删除该资源）
+        drawer.append(this._renderDangerDeleteSection(type, item));
+
         return drawer;
+    }
+
+    _renderDangerDeleteSection(type, item) {
+        const sec = createEl('section', 'trh-inspector-section trh-danger-zone');
+        const isConfirming = this.pendingDelete?.type === type && this.pendingDelete?.id === item.id;
+
+        if (!isConfirming) {
+            const row = createEl('div', 'trh-danger-row');
+            row.append(createEl('span', 'trh-text-muted', `移除此${TYPE_LABELS[type]}`));
+            const delBtn = createEl('button', 'trh-btn trh-btn-xs trh-btn-danger', `删除${TYPE_LABELS[type]}`);
+            delBtn.type = 'button';
+            delBtn.id = 'trh_delete_resource_btn';
+            delBtn.disabled = this.isBusy;
+            delBtn.addEventListener('click', () => {
+                this.pendingDelete = { type, id: item.id, deleteChats: false };
+                this.render();
+            });
+            row.append(delBtn);
+            sec.append(row);
+            return sec;
+        }
+
+        const confirmBox = createEl('div', 'trh-delete-confirm');
+        confirmBox.append(
+            createEl('div', 'trh-delete-confirm-title', `确认删除${TYPE_LABELS[type]}「${item.name}」？`),
+            createEl('div', 'trh-delete-confirm-hint', '此操作会从酒馆中移除该资源并清除关联更新源，删除后无法通过本地快照恢复。')
+        );
+
+        if (type === 'character') {
+            const cbLabel = createEl('label', 'trh-checkbox-row');
+            const cb = createEl('input');
+            cb.type = 'checkbox';
+            cb.id = 'trh_delete_chats_checkbox';
+            cb.checked = Boolean(this.pendingDelete.deleteChats);
+            cb.addEventListener('change', () => {
+                if (this.pendingDelete) this.pendingDelete.deleteChats = cb.checked;
+            });
+            cbLabel.append(cb, createEl('span', '', '同时删除该角色的历史聊天记录'));
+            confirmBox.append(cbLabel);
+        }
+
+        const btnRow = createEl('div', 'trh-btn-row');
+        const cancelBtn = createEl('button', 'trh-btn trh-btn-sm trh-btn-ghost', '取消');
+        cancelBtn.type = 'button';
+        cancelBtn.addEventListener('click', () => {
+            this.pendingDelete = null;
+            this.render();
+        });
+
+        const confirmBtn = createEl('button', 'trh-btn trh-btn-sm trh-btn-danger', this.isBusy ? '删除中...' : '确认删除');
+        confirmBtn.type = 'button';
+        confirmBtn.id = 'trh_confirm_delete_btn';
+        confirmBtn.disabled = this.isBusy;
+        confirmBtn.addEventListener('click', () => this._executeDeleteResource());
+
+        btnRow.append(cancelBtn, confirmBtn);
+        confirmBox.append(btnRow);
+        sec.append(confirmBox);
+        return sec;
+    }
+
+    async _executeDeleteResource() {
+        if (!this.pendingDelete) return;
+        const { type, id, deleteChats } = this.pendingDelete;
+        const targetItem = (this.catalog[type] || []).find(entry => entry.id === id);
+        const displayName = targetItem?.name || id;
+
+        this.isBusy = true;
+        this.render();
+        try {
+            await PlatformAdapter.deleteResource(this.getContext?.(), type, id, {
+                deleteChats,
+                fetchImpl: this.fetchImpl,
+            });
+            this.store.removeBinding(type, id);
+            this.store.clearSnapshot(type, id);
+            this.pendingDelete = null;
+            if (this.selected?.type === type && this.selected?.id === id) {
+                this.selected = null;
+            }
+            this.mobileInspectorOpen = false;
+            this.notify('success', `已删除${TYPE_LABELS[type]}: ${displayName}`);
+            await this.refreshCatalog();
+        } catch (err) {
+            this.notify('error', `删除失败: ${err.message}`);
+        } finally {
+            this.isBusy = false;
+            this.render();
+        }
     }
 
     _renderCharacterRelationsSection(charItem, binding) {

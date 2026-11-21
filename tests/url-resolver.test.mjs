@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    extractResourceUrl,
     normalizeResourceUrl,
     classifyJsonResource,
     inspectResourceBytes,
@@ -39,6 +40,17 @@ test('normalizeResourceUrl applies optional GitHub mirror prefix and blocks unsa
     assert.throws(() => normalizeResourceUrl('javascript:alert(1)'), /仅支持 HTTP \/ HTTPS/);
     assert.throws(() => normalizeResourceUrl('file:///C:/secret.json'), /仅支持 HTTP \/ HTTPS/);
     assert.throws(() => normalizeResourceUrl(''), /请输入有效/);
+});
+
+test('extractResourceUrl & normalizeResourceUrl extract URL from Chinese description text and Markdown links', () => {
+    const withChinese = '【角色卡更新】星野梦 v2.4 下载链接：https://github.com/user/repo/blob/main/Alice.png（推荐搭配破限预设，勿商用）';
+    assert.equal(extractResourceUrl(withChinese), 'https://github.com/user/repo/blob/main/Alice.png');
+    const resolved = normalizeResourceUrl(withChinese);
+    assert.equal(resolved.originalUrl, 'https://github.com/user/repo/blob/main/Alice.png');
+    assert.equal(resolved.resolvedUrl, 'https://raw.githubusercontent.com/user/repo/main/Alice.png');
+
+    const markdownText = '点击这里下载：[预设文件](https://example.com/presets/Prose_v3.json)，包含正则与助手脚本。';
+    assert.equal(extractResourceUrl(markdownText), 'https://example.com/presets/Prose_v3.json');
 });
 
 test('inspectResourceBytes auto-detects PNG character cards, JSON character cards, presets, and worldbooks', async () => {

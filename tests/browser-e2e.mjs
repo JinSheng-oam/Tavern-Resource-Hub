@@ -635,6 +635,14 @@ try {
     await evaluate(`document.querySelector('.trh-nav-item[data-tab="preset"]').click(); new Promise(r => setTimeout(r, 120))`);
     await captureScreenshot('trh-presets-mobile.png');
 
+    // 在手机端打开预设内部编辑器并抓拍截图验证布局
+    await evaluate(`document.querySelector('.trh-resource-row').click(); new Promise(r => setTimeout(r, 80))`);
+    await evaluate(`document.getElementById('trh_open_editor_btn').click(); new Promise(r => setTimeout(r, 120))`);
+    assert.equal(await evaluate(`document.documentElement.scrollWidth <= window.innerWidth`), true);
+    await captureScreenshot('trh-editor-mobile.png');
+    await evaluate(`document.querySelector('#trh_data_editor_modal .trh-editor-header .trh-btn-icon').click(); new Promise(r => setTimeout(r, 80))`);
+    await evaluate(`document.querySelector('.trh-mobile-sheet-close')?.click(); new Promise(r => setTimeout(r, 80))`);
+
     // 6. 验证内部数据查看与编辑功能（修改角色卡描述并保存）
     await cdp('Emulation.setDeviceMetricsOverride', {
         width: 1366,

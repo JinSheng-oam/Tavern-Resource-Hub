@@ -339,11 +339,20 @@ export class ResourceHubWorkspace {
                     fetchImpl: this.fetchImpl,
                 });
                 checked++;
-                const preview = await this._computePreviewForTarget(item.type, item.id, inspection);
-                const hasUpdate = preview ? !preview.isIdentical : (item.lastHash !== inspection.hash);
+
+                let hasUpdate = false;
+                if (item.lastHash && item.lastHash === inspection.hash) {
+                    // 远端文件指纹与上次更新完全一致，直接判定无更新
+                    hasUpdate = false;
+                } else {
+                    const preview = await this._computePreviewForTarget(item.type, item.id, inspection);
+                    hasUpdate = preview ? !preview.isIdentical : (item.lastHash !== inspection.hash);
+                }
+
                 if (hasUpdate) foundUpdates++;
 
                 this.store.setBinding(item.type, item.id, {
+                    ...(!hasUpdate && !item.lastHash ? { lastHash: inspection.hash } : {}),
                     remoteHash: inspection.hash,
                     remoteVersion: inspection.version || '',
                     lastCheckedAt: Date.now(),

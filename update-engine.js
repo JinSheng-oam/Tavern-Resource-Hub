@@ -47,6 +47,37 @@ function isPlainObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * 构建用于版本一致性的去噪对象（剔除本地运行时/保护字段，避免同版本误报有更新）
+ */
+function stripLocalCharacterNoise(v2Object) {
+    const clean = structuredClone(v2Object);
+    delete clean.avatar;
+    delete clean.chat;
+    delete clean.create_date;
+    delete clean.fav;
+    delete clean.world;
+    if (isPlainObject(clean.data?.extensions)) {
+        delete clean.data.extensions.fav;
+        delete clean.data.extensions.world;
+        if (isPlainObject(clean.data.extensions.tavern_helper)) {
+            delete clean.data.extensions.tavern_helper.variables;
+        }
+    }
+    return clean;
+}
+
+function stripProtectedPresetNoise(rawPreset) {
+    const clean = structuredClone(rawPreset);
+    for (const field of PROTECTED_PRESET_CONNECTION_FIELDS) {
+        delete clean[field];
+    }
+    if (isPlainObject(clean.extensions?.tavern_helper)) {
+        delete clean.extensions.tavern_helper.variables;
+    }
+    return clean;
+}
+
 export class UpdateEngine {
     /**
      * 生成更新前的本地 vs 远端差异预览报告
@@ -59,10 +90,11 @@ export class UpdateEngine {
         if (type === 'character') {
             const localNorm = normalizeCharacterPayload(localData);
             const remoteNorm = remoteInspection.normalized;
-            const localHash = await sha256Hex(canonicalStringify(localNorm.v2Object));
-            const remoteHash = remoteInspection.hash;
+            const localHash = await sha256Hex(canonicalStringify(stripLocalCharacterNoise(localNorm.v2Object)));
+            const remoteHash = await sha256Hex(canonicalStringify(stripLocalCharacterNoise(remoteNorm.v2Object)));
 
             const changedFields = [];
+            if (localNorm.version !== remoteNorm.version) changedFields.push(`版本号 (${localNorm.version || '无'} → ${remoteNorm.version || '无'})`);
             if (localNorm.description !== remoteNorm.description) changedFields.push('角色描述 (description)');
             if (localNorm.personality !== remoteNorm.personality) changedFields.push('性格特征 (personality)');
             if (localNorm.scenario !== remoteNorm.scenario) changedFields.push('场景设定 (scenario)');
@@ -107,8 +139,8 @@ export class UpdateEngine {
         if (type === 'preset') {
             const localInsp = inspectPresetPayload(localData);
             const remoteInsp = remoteInspection.normalized;
-            const localHash = await sha256Hex(canonicalStringify(localInsp.rawPreset));
-            const remoteHash = remoteInspection.hash;
+            const localHash = await sha256Hex(canonicalStringify(stripProtectedPresetNoise(localInsp.rawPreset)));
+            const remoteHash = await sha256Hex(canonicalStringify(stripProtectedPresetNoise(remoteInsp.rawPreset)));
 
             const localPrompts = Array.isArray(localData.prompts) ? localData.prompts : [];
             const remotePrompts = Array.isArray(remoteInspection.rawJson.prompts) ? remoteInspection.rawJson.prompts : [];
@@ -122,7 +154,7 @@ export class UpdateEngine {
             for (const [id, rp] of remoteById.entries()) {
                 if (!localById.has(id)) {
                     addedPrompts++;
-                } else if (JSON.stringify(localById.get(id)) !== JSON.stringify(rp)) {
+                } else if (canonicalStringify(localById.get(id)) !== canonicalStringify(rp)) {
                     modifiedPrompts++;
                 }
             }
@@ -149,7 +181,7 @@ export class UpdateEngine {
 
             return {
                 type: 'preset',
-                isIdentical: localHash === remoteHash,
+                isIdentical: localHash === remoteHash && changedFields.length === 0,
                 localVersion: localInsp.version || '未标注',
                 remoteVersion: remoteInsp.version || '未标注',
                 localHash,

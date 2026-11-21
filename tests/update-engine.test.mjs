@@ -332,3 +332,67 @@ test('PlatformAdapter.deleteResource deletes characters, presets, and worldbooks
     assert.equal('用户本地绑定的主世界书' in context.worldbooks, false);
     assert.deepEqual(apiCalls[2], { url: '/api/worldinfo/delete', body: { name: '用户本地绑定的主世界书' } });
 });
+
+test('buildUpdatePreview reports isIdentical=true when character or preset matches remote content despite local runtime/protected fields', async () => {
+    const context = createMockHostContext();
+
+    // 1. 同版本角色卡（本地带有 avatar, chat, fav, world 绑定, tavern_helper.variables）
+    const sameCharRemote = await inspectResourceBytes(JSON.stringify({
+        spec: 'chara_card_v2',
+        spec_version: '2.0',
+        data: {
+            name: '爱丽丝',
+            description: '旧版角色描述 v1.0',
+            personality: '温柔谨慎',
+            scenario: '旧书店',
+            first_mes: '你好，我是旧版开场白（用户本地微调过）。',
+            character_version: '1.0.0',
+            alternate_greetings: ['旧候选开场白1'],
+            tags: ['奇幻'],
+            extensions: {
+                world: '作者原世界书名称',
+                fav: false,
+                regex_scripts: [{ id: 'local-rx', scriptName: '本地正则' }],
+                tavern_helper: {
+                    scripts: [{ id: 's1', name: '旧脚本 v1' }],
+                    variables: { userCustomTheme: 'default', affection: 0 },
+                },
+            },
+        },
+    }), { fileName: 'Alice.json' });
+
+    const charPreview = await UpdateEngine.buildUpdatePreview({
+        type: 'character',
+        localData: context.characters[0],
+        remoteInspection: sameCharRemote,
+    });
+    assert.equal(charPreview.isIdentical, true);
+    assert.equal(charPreview.changedFields.length, 0);
+
+    // 2. 同版本预设（本地带有用户的 custom_url, custom_model 与 tavern_helper.variables）
+    const samePresetRemote = await inspectResourceBytes(JSON.stringify({
+        temperature: 0.7,
+        openai_max_context: 32000,
+        chat_completion_source: 'openai',
+        custom_url: 'https://authors-other-url.invalid/v1',
+        custom_model: 'other-model',
+        prompts: [
+            { identifier: 'main', name: '主提示词', role: 'system', content: '旧版主提示词', enabled: true },
+            { identifier: 'nsfw_toggle', name: '可选模块', role: 'system', content: '旧模块内容', enabled: false },
+        ],
+        extensions: {
+            tavern_helper: {
+                scripts: [{ id: 'ps1', name: '预设脚本 v1' }],
+                variables: { statusColor: '#000000' },
+            },
+        },
+    }), { fileName: '日常写作预设.json' });
+
+    const presetPreview = await UpdateEngine.buildUpdatePreview({
+        type: 'preset',
+        localData: context.presets['日常写作预设'],
+        remoteInspection: samePresetRemote,
+    });
+    assert.equal(presetPreview.isIdentical, true);
+    assert.equal(presetPreview.changedFields.length, 0);
+});

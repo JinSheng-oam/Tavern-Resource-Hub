@@ -7,6 +7,7 @@ import { PlatformAdapter } from './platform.js';
 import { extractResourceUrl, normalizeResourceUrl, inspectResourceBytes, fetchAndInspectUrl } from './url-resolver.js';
 import { UpdateEngine } from './update-engine.js';
 import { normalizeCharacterPayload } from './card-codec.js';
+import { ResourceDataEditor } from './data-editor.js';
 
 const TYPE_LABELS = {
     character: '角色卡',
@@ -85,6 +86,13 @@ export class ResourceHubWorkspace {
         this.isBusy = false;
         this.showSettingsPopover = false;
         this._keydownHandler = this._handleKeydown.bind(this);
+        this.dataEditor = new ResourceDataEditor({
+            getContext: this.getContext,
+            store: this.store,
+            fetchImpl: this.fetchImpl,
+            onNotify: (level, msg) => this.notify(level, msg),
+            onSaved: () => this.refreshCatalog(),
+        });
     }
 
     notify(level, message) {
@@ -102,6 +110,10 @@ export class ResourceHubWorkspace {
     _handleKeydown(e) {
         if (!this.isOpen) return;
         if (e.key === 'Escape') {
+            if (this.dataEditor?.isOpen) {
+                this.dataEditor.close();
+                return;
+            }
             if (this.showSettingsPopover) {
                 this.showSettingsPopover = false;
                 this.render();
@@ -139,6 +151,7 @@ export class ResourceHubWorkspace {
     close() {
         this.isOpen = false;
         this.showSettingsPopover = false;
+        this.dataEditor?.close();
         document.removeEventListener('keydown', this._keydownHandler);
         if (this.root?.isConnected) {
             this.root.remove();
@@ -459,8 +472,13 @@ export class ResourceHubWorkspace {
     // DOM 渲染层
     // =========================================================================
 
-    render() {
+    render({ preserveScroll = true } = {}) {
         if (!this.root) return;
+
+        const prevStageTop = preserveScroll ? (this.root.querySelector('.trh-stage-content')?.scrollTop || 0) : 0;
+        const prevInspectorTop = preserveScroll ? (this.root.querySelector('.trh-inspector')?.scrollTop || 0) : 0;
+        const prevNavLeft = preserveScroll ? (this.root.querySelector('.trh-nav-rail')?.scrollLeft || 0) : 0;
+
         this.root.dataset.theme = this.store.getTheme();
         this.root.replaceChildren();
 
@@ -470,6 +488,15 @@ export class ResourceHubWorkspace {
             this._renderMainBody()
         );
         this.root.append(shell);
+
+        if (preserveScroll) {
+            const stageEl = this.root.querySelector('.trh-stage-content');
+            const inspectorEl = this.root.querySelector('.trh-inspector');
+            const navEl = this.root.querySelector('.trh-nav-rail');
+            if (stageEl && prevStageTop > 0) stageEl.scrollTop = prevStageTop;
+            if (inspectorEl && prevInspectorTop > 0) inspectorEl.scrollTop = prevInspectorTop;
+            if (navEl && prevNavLeft > 0) navEl.scrollLeft = prevNavLeft;
+        }
     }
 
     _renderTopBar() {
@@ -1072,7 +1099,19 @@ export class ResourceHubWorkspace {
 
         const title = createEl('h2', 'trh-inspector-title', item.name);
         const idLine = createEl('div', 'trh-mono-sub', `标识: ${item.id}${item.version ? ` · 版本: v${item.version.replace(/^v/i, '')}` : ''}`);
-        header.append(headTopRow, title, idLine);
+        const editBtn = createEl('button', 'trh-btn trh-btn-sm trh-btn-subtle trh-btn-block');
+        editBtn.type = 'button';
+        editBtn.id = 'trh_open_editor_btn';
+        editBtn.append(createIcon('fa-pen-to-square'), createEl('span', '', `查看与编辑${TYPE_LABELS[type]}内部数据`));
+        editBtn.addEventListener('click', () => {
+            this.dataEditor.open({
+                type,
+                id,
+                name: item.name,
+                parentEl: this.root,
+            }).catch(err => this.notify('error', `无法读取内部数据: ${err.message}`));
+        });
+        header.append(headTopRow, title, idLine, editBtn);
 
         // 若有更新前快照，提供一键回滚卡片
         if (snapshot) {
@@ -1223,7 +1262,7 @@ export class ResourceHubWorkspace {
             confirmBox.append(cbLabel);
         }
 
-        const btnRow = createEl('div', 'trh-btn-row');
+        const btnRow = createEl('div', 'trh-btn-row trh-btn-row-end');
         const cancelBtn = createEl('button', 'trh-btn trh-btn-sm trh-btn-ghost', '取消');
         cancelBtn.type = 'button';
         cancelBtn.addEventListener('click', () => {

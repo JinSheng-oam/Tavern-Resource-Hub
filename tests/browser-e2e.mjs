@@ -99,6 +99,7 @@ const remoteUpdatedAlicePng = encodePngCharacterCard(MINIMAL_1X1_PNG, {
 const moduleFiles = new Set([
     'index.js',
     'ui-workspace.js',
+    'data-editor.js',
     'update-engine.js',
     'platform.js',
     'url-resolver.js',
@@ -634,7 +635,7 @@ try {
     await evaluate(`document.querySelector('.trh-nav-item[data-tab="preset"]').click(); new Promise(r => setTimeout(r, 120))`);
     await captureScreenshot('trh-presets-mobile.png');
 
-    // 6. 验证删除功能：在桌面视图选中第三张角色卡“苏沐晴”并点击删除 -> 确认删除
+    // 6. 验证内部数据查看与编辑功能（修改角色卡描述并保存）
     await cdp('Emulation.setDeviceMetricsOverride', {
         width: 1366,
         height: 860,
@@ -643,7 +644,44 @@ try {
     }, sessionId);
     await evaluate(`document.querySelector('.trh-nav-item[data-tab="character"]').click(); new Promise(r => setTimeout(r, 100))`);
     await evaluate(`document.querySelector('.trh-char-card[data-id="SuMuqing.png"]').click(); new Promise(r => setTimeout(r, 80))`);
-    await evaluate(`document.getElementById('trh_delete_resource_btn').click(); new Promise(r => setTimeout(r, 80))`);
+    await evaluate(`document.getElementById('trh_open_editor_btn').click(); new Promise(r => setTimeout(r, 100))`);
+    assert.equal(await evaluate(`Boolean(document.getElementById('trh_data_editor_modal'))`), true);
+    await evaluate(`(() => {
+        const ta = document.querySelector('#trh_data_editor_modal textarea');
+        ta.value = '江南药王谷传人，已通过内部编辑器更新描述。';
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await evaluate(`(async () => {
+        document.getElementById('trh_editor_save_btn').click();
+        for (let i = 0; i < 40; i++) {
+            if (!document.getElementById('trh_data_editor_modal')) break;
+            await new Promise(r => setTimeout(r, 40));
+        }
+    })()`);
+    assert.equal(
+        await evaluate(`window.SillyTavern.getContext().characters.find(c => c.avatar === 'SuMuqing.png').description`),
+        '江南药王谷传人，已通过内部编辑器更新描述。'
+    );
+
+    // 7. 验证删除时页面不跳到最上面、确认按钮靠右，并成功删除角色卡
+    await evaluate(`(() => {
+        const inspector = document.querySelector('.trh-inspector');
+        inspector.scrollTop = 180;
+        window.scrollBeforeDeletePrompt = inspector.scrollTop;
+        document.getElementById('trh_delete_resource_btn').click();
+    })()`);
+    await new Promise(r => setTimeout(r, 80));
+    const deleteLayout = await evaluate(`(() => {
+        const inspector = document.querySelector('.trh-inspector');
+        const confirmBtn = document.getElementById('trh_confirm_delete_btn');
+        const cancelBtn = confirmBtn.previousElementSibling;
+        return {
+            scrollPreserved: inspector.scrollTop >= window.scrollBeforeDeletePrompt - 5,
+            confirmOnRight: confirmBtn.getBoundingClientRect().left > cancelBtn.getBoundingClientRect().left,
+        };
+    })()`);
+    assert.deepEqual(deleteLayout, { scrollPreserved: true, confirmOnRight: true });
+
     await evaluate(`(async () => {
         document.getElementById('trh_confirm_delete_btn').click();
         for (let i = 0; i < 40; i++) {
@@ -653,7 +691,7 @@ try {
     })()`);
     assert.equal(await evaluate(`document.querySelectorAll('.trh-char-card').length`), 2, '确认删除后角色卡数量减少为 2');
 
-    // 7. 验证 dispose 生命周期完整清理
+    // 8. 验证 dispose 生命周期完整清理
     await evaluate(`window.trhDispose()`);
     const cleaned = await evaluate(`[
         Boolean(document.getElementById('tavern_resource_hub_overlay')),

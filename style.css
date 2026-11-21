@@ -25,11 +25,29 @@
    1. 宿主扩展设置区原生抽屉内容 (.trh-drawer-body)
    ========================================================================= */
 
+#tavern_resource_hub_launcher,
+#tavern_resource_hub_launcher .inline-drawer,
+#tavern_resource_hub_launcher .inline-drawer-content {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+#tavern_resource_hub_launcher .inline-drawer-header {
+    width: 100%;
+    box-sizing: border-box;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
 .trh-drawer-body {
     display: flex;
     flex-direction: column;
     gap: 10px;
     padding: 6px 2px 10px 2px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .trh-drawer-status {

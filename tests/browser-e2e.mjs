@@ -512,16 +512,24 @@ try {
 
     assert.equal(exceptions.length, 0, `页面初始化异常: ${JSON.stringify(exceptions)}`);
 
-    // 1. 验证原生抽屉入口与魔法棒菜单入口挂载成功且名称精简为“资源管理器”
-    const mounted = await evaluate(`({
-        hasDrawer: Boolean(document.querySelector('#tavern_resource_hub_launcher .inline-drawer')),
-        drawerTitle: document.querySelector('#tavern_resource_hub_launcher .inline-drawer-header b')?.textContent || '',
-        wandLabel: document.querySelector('#tavern_resource_hub_wand_button span')?.textContent || '',
-    })`);
+    // 1. 验证原生抽屉入口与魔法棒菜单入口挂载成功且名称精简为“资源管理器”，抽屉宽度占满父容器
+    const mounted = await evaluate(`(() => {
+        const launcher = document.getElementById('tavern_resource_hub_launcher');
+        const header = launcher?.querySelector('.inline-drawer-header');
+        const parentWidth = launcher?.parentElement?.getBoundingClientRect().width || 0;
+        const headerWidth = header?.getBoundingClientRect().width || 0;
+        return {
+            hasDrawer: Boolean(launcher?.querySelector('.inline-drawer')),
+            drawerTitle: header?.querySelector('b')?.textContent || '',
+            wandLabel: document.querySelector('#tavern_resource_hub_wand_button span')?.textContent || '',
+            drawerFillsParent: parentWidth > 0 && Math.abs(parentWidth - headerWidth) <= 2,
+        };
+    })()`);
     assert.deepEqual(mounted, {
         hasDrawer: true,
         drawerTitle: '资源管理器',
         wandLabel: '资源管理器',
+        drawerFillsParent: true,
     });
 
     // 2. 点击打开独立全屏管理器

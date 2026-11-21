@@ -80,6 +80,7 @@ export class ResourceHubWorkspace {
 
         this.selected = null; // { type: 'character'|'preset'|'worldbook', id: string }
         this.stagedUpdate = null; // { inspection, targetType, targetId, mode: 'inplace'|'create', preview, options }
+        this.mobileInspectorOpen = false;
         this.isBusy = false;
         this.showSettingsPopover = false;
         this._keydownHandler = this._handleKeydown.bind(this);
@@ -102,6 +103,12 @@ export class ResourceHubWorkspace {
         if (e.key === 'Escape') {
             if (this.showSettingsPopover) {
                 this.showSettingsPopover = false;
+                this.render();
+                return;
+            }
+            if (this.mobileInspectorOpen && typeof window !== 'undefined' && window.innerWidth <= 780) {
+                this.mobileInspectorOpen = false;
+                this.stagedUpdate = null;
                 this.render();
                 return;
             }
@@ -278,6 +285,7 @@ export class ResourceHubWorkspace {
             preview,
             options: preserveOptions,
         };
+        this.mobileInspectorOpen = true;
     }
 
     async _computePreviewForTarget(type, targetId, inspection) {
@@ -462,7 +470,7 @@ export class ResourceHubWorkspace {
         const logo = createEl('div', 'trh-brand-mark');
         logo.append(createIcon('fa-cubes'));
         const titleWrap = createEl('div', 'trh-brand-titles');
-        const title = createEl('h1', 'trh-brand-title', '典藏工坊 · 资源管理器');
+        const title = createEl('h1', 'trh-brand-title', '资源管理器');
         const metaRow = createEl('div', 'trh-env-pills');
 
         const hostPill = createEl('span', 'trh-env-pill', env.host);
@@ -470,10 +478,21 @@ export class ResourceHubWorkspace {
 
         const helperPill = createEl(
             'span',
-            `trh-env-pill ${env.hasTavernHelper ? 'is-connected' : 'is-muted'}`,
-            env.hasTavernHelper
-                ? `酒馆助手已联动${env.tavernHelperVersion && env.tavernHelperVersion !== 'detected' ? ` v${env.tavernHelperVersion}` : ''}`
-                : '标准原生模式'
+            `trh-env-pill ${env.hasTavernHelper ? 'is-connected' : 'is-muted'}`
+        );
+        helperPill.append(
+            createEl(
+                'span',
+                'trh-hide-xs',
+                env.hasTavernHelper
+                    ? `酒馆助手已联动${env.tavernHelperVersion && env.tavernHelperVersion !== 'detected' ? ` v${env.tavernHelperVersion}` : ''}`
+                    : '标准原生模式'
+            ),
+            createEl(
+                'span',
+                'trh-show-xs-inline',
+                env.hasTavernHelper ? '助手已联动' : '原生模式'
+            )
         );
         metaRow.append(helperPill);
 
@@ -506,10 +525,10 @@ export class ResourceHubWorkspace {
             if (file) this.probeLocalFile(file, this.selected);
         });
 
-        const fileBtn = createEl('button', 'trh-btn trh-btn-ghost', '本地文件');
+        const fileBtn = createEl('button', 'trh-btn trh-btn-ghost');
         fileBtn.type = 'button';
         fileBtn.title = '选择本地 PNG 或 JSON 文件进行原地无损更新';
-        fileBtn.prepend(createIcon('fa-folder-open'));
+        fileBtn.append(createIcon('fa-folder-open'), createEl('span', 'trh-hide-xs', '本地文件'));
         fileBtn.addEventListener('click', () => fileInput.click());
 
         urlBar.append(urlIcon, urlInput, probeBtn, fileBtn, fileInput);
@@ -528,7 +547,8 @@ export class ResourceHubWorkspace {
         checkAllBtn.disabled = this.isBusy;
         checkAllBtn.append(
             createIcon('fa-arrows-rotate'),
-            createEl('span', '', counts.updateCount > 0 ? `检查更新 (${counts.updateCount})` : '检查已绑定更新')
+            createEl('span', 'trh-hide-xs', counts.updateCount > 0 ? `检查更新 (${counts.updateCount})` : '检查已绑定更新'),
+            createEl('span', 'trh-show-xs-inline', counts.updateCount > 0 ? `更新(${counts.updateCount})` : '检查')
         );
         checkAllBtn.addEventListener('click', () => this.checkAllBoundUpdates());
 
@@ -545,7 +565,11 @@ export class ResourceHubWorkspace {
         const closeBtn = createEl('button', 'trh-btn trh-btn-ghost trh-close-btn');
         closeBtn.type = 'button';
         closeBtn.id = 'trh_close_workspace_btn';
-        closeBtn.append(createIcon('fa-xmark'), createEl('span', '', '返回酒馆'));
+        closeBtn.append(
+            createIcon('fa-xmark'),
+            createEl('span', 'trh-hide-xs', '返回酒馆'),
+            createEl('span', 'trh-show-xs-inline', '返回')
+        );
         closeBtn.addEventListener('click', () => this.close());
 
         actions.append(checkAllBtn, settingsBtn, closeBtn);
@@ -588,12 +612,24 @@ export class ResourceHubWorkspace {
     }
 
     _renderMainBody() {
-        const main = createEl('div', 'trh-workspace-body');
+        const isSheetOpen = Boolean(this.mobileInspectorOpen || this.stagedUpdate);
+        const main = createEl('div', `trh-workspace-body ${isSheetOpen ? 'has-mobile-sheet' : ''}`);
         main.append(
             this._renderNavRail(),
-            this._renderCenterStage(),
-            this._renderInspectorDrawer()
+            this._renderCenterStage()
         );
+
+        if (isSheetOpen) {
+            const backdrop = createEl('div', 'trh-mobile-backdrop');
+            backdrop.addEventListener('click', () => {
+                this.mobileInspectorOpen = false;
+                this.stagedUpdate = null;
+                this.render();
+            });
+            main.append(backdrop);
+        }
+
+        main.append(this._renderInspectorDrawer(isSheetOpen));
         return main;
     }
 
@@ -628,6 +664,7 @@ export class ResourceHubWorkspace {
             btn.append(left, right);
             btn.addEventListener('click', () => {
                 this.activeTab = item.id;
+                this.mobileInspectorOpen = false;
                 if (item.id !== 'bound') {
                     const first = this.catalog[item.id]?.[0];
                     if (first && (!this.selected || this.selected.type !== item.id)) {
@@ -850,6 +887,7 @@ export class ResourceHubWorkspace {
 
         card.addEventListener('click', () => {
             this.selected = { type: 'character', id: item.id };
+            this.mobileInspectorOpen = true;
             this.render();
         });
 
@@ -953,6 +991,7 @@ export class ResourceHubWorkspace {
         row.append(iconBox, info, actions);
         row.addEventListener('click', () => {
             this.selected = { type, id: item.id };
+            this.mobileInspectorOpen = true;
             this.render();
         });
 
@@ -963,8 +1002,8 @@ export class ResourceHubWorkspace {
     // 右侧详情与原地更新抽屉
     // =========================================================================
 
-    _renderInspectorDrawer() {
-        const drawer = createEl('aside', 'trh-inspector');
+    _renderInspectorDrawer(isSheetOpen = false) {
+        const drawer = createEl('aside', `trh-inspector ${isSheetOpen ? 'is-mobile-open' : ''}`);
 
         // 如果存在已解析待确认的远端更新包，优先展示原地更新预览与确认工作流
         if (this.stagedUpdate) {
@@ -993,12 +1032,22 @@ export class ResourceHubWorkspace {
         const binding = this.store.getBinding(type, id);
         const snapshot = this.store.getSnapshot(type, id);
 
-        // 1. 头部概要
+        // 1. 头部概要（含移动端收起按钮）
         const header = createEl('div', 'trh-inspector-header');
+        const headTopRow = createEl('div', 'trh-inspector-head-top');
         const typeBadge = createEl('span', 'trh-badge trh-badge-slate', TYPE_LABELS[type]);
+        const mobileCloseBtn = createEl('button', 'trh-btn trh-btn-xs trh-btn-ghost trh-mobile-sheet-close');
+        mobileCloseBtn.type = 'button';
+        mobileCloseBtn.append(createIcon('fa-chevron-down'), createEl('span', '', '收起详情'));
+        mobileCloseBtn.addEventListener('click', () => {
+            this.mobileInspectorOpen = false;
+            this.render();
+        });
+        headTopRow.append(typeBadge, mobileCloseBtn);
+
         const title = createEl('h2', 'trh-inspector-title', item.name);
         const idLine = createEl('div', 'trh-mono-sub', `标识: ${item.id}${item.version ? ` · 版本: v${item.version.replace(/^v/i, '')}` : ''}`);
-        header.append(typeBadge, title, idLine);
+        header.append(headTopRow, title, idLine);
 
         // 若有更新前快照，提供一键回滚卡片
         if (snapshot) {
@@ -1302,14 +1351,25 @@ export class ResourceHubWorkspace {
         const panel = createEl('div', 'trh-staged-panel');
 
         const header = createEl('div', 'trh-staged-header');
+        const headTopRow = createEl('div', 'trh-inspector-head-top');
         const badge = createEl('span', 'trh-badge trh-badge-amber', `待确认 · ${TYPE_LABELS[targetType]}更新`);
+        const mobileCloseBtn = createEl('button', 'trh-btn trh-btn-xs trh-btn-ghost trh-mobile-sheet-close');
+        mobileCloseBtn.type = 'button';
+        mobileCloseBtn.append(createIcon('fa-chevron-down'), createEl('span', '', '收起'));
+        mobileCloseBtn.addEventListener('click', () => {
+            this.stagedUpdate = null;
+            this.mobileInspectorOpen = false;
+            this.render();
+        });
+        headTopRow.append(badge, mobileCloseBtn);
+
         const title = createEl('h2', 'trh-inspector-title', inspection.name);
         const sub = createEl(
             'div',
             'trh-mono-sub',
             `格式: ${inspection.format.toUpperCase()} · 大小: ${(inspection.byteLength / 1024).toFixed(1)} KB · SHA256: ${inspection.hash.slice(0, 10)}`
         );
-        header.append(badge, title, sub);
+        header.append(headTopRow, title, sub);
         panel.append(header);
 
         // 1. 选择更新方式：原地更新现有资源 vs 导入为新资源
@@ -1413,6 +1473,7 @@ export class ResourceHubWorkspace {
         cancelBtn.type = 'button';
         cancelBtn.addEventListener('click', () => {
             this.stagedUpdate = null;
+            this.mobileInspectorOpen = false;
             this.render();
         });
 

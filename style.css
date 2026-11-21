@@ -22,63 +22,31 @@
 }
 
 /* =========================================================================
-   1. 宿主扩展设置区启动卡片 (.trh-launcher-card)
+   1. 宿主扩展设置区原生抽屉内容 (.trh-drawer-body)
    ========================================================================= */
 
-.trh-launcher-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 12px 14px;
-    margin: 6px 0;
-    border-radius: 8px;
-    background: var(--SmartThemeBlurTintColor, #191E2B);
-    border: 1px solid var(--SmartThemeBorderColor, #283044);
-    color: var(--SmartThemeBodyColor, #ECF0F6);
-}
-
-.trh-launcher-info {
+.trh-drawer-body {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    min-width: 0;
+    gap: 10px;
+    padding: 6px 2px 10px 2px;
 }
 
-.trh-launcher-title {
-    font-weight: 600;
-    font-size: 0.95em;
+.trh-drawer-status {
+    font-size: 0.88em;
+    opacity: 0.85;
+}
+
+.trh-drawer-actions {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.trh-launcher-title i {
-    color: var(--trh-accent-amber);
-}
-
-.trh-launcher-sub {
-    font-size: 0.82em;
-    opacity: 0.78;
-}
-
-.trh-launcher-open-btn {
-    flex-shrink: 0;
+.trh-drawer-actions .menu_button {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    padding: 7px 13px;
-    border-radius: 6px;
-    border: 1px solid rgba(245, 165, 36, 0.45);
-    background: rgba(245, 165, 36, 0.15);
-    color: var(--SmartThemeBodyColor, #ECF0F6);
-    font-weight: 600;
-    font-size: 0.86em;
-    cursor: pointer;
-}
-
-.trh-launcher-open-btn:hover {
-    background: rgba(245, 165, 36, 0.26);
 }
 
 /* =========================================================================
@@ -88,6 +56,9 @@
 .trh-overlay {
     position: fixed;
     inset: 0;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
     z-index: 31000;
     background: var(--trh-bg-obsidian);
     color: var(--trh-text-primary);
@@ -153,6 +124,8 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .trh-brand-title {
@@ -694,6 +667,20 @@
     border-bottom: 1px solid var(--trh-border);
 }
 
+.trh-inspector-head-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+}
+
+.trh-mobile-sheet-close,
+.trh-mobile-backdrop,
+.trh-show-xs-inline {
+    display: none;
+}
+
 .trh-inspector-title {
     margin: 0;
     font-size: 17px;
@@ -1084,7 +1071,7 @@
 
 @media (max-width: 1080px) {
     .trh-topbar {
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 10px;
     }
     .trh-url-bar {
@@ -1093,50 +1080,97 @@
         max-width: 100%;
     }
     .trh-workspace-body {
-        grid-template-columns: 180px minmax(0, 1fr) 330px;
+        grid-template-columns: 184px minmax(0, 1fr) 336px;
     }
 }
 
 @media (max-width: 780px) {
+    .trh-hide-xs {
+        display: none !important;
+    }
+    .trh-show-xs-inline {
+        display: inline !important;
+    }
+
+    /* 顶部两行紧凑布局：第一行 品牌+动作按钮，第二行 链接输入栏 */
     .trh-topbar {
-        grid-template-columns: minmax(0, 1fr);
-        padding: 10px 12px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 9px 12px;
         gap: 8px;
     }
     .trh-brand-group {
-        justify-content: flex-start;
+        gap: 9px;
         min-width: 0;
+    }
+    .trh-brand-mark {
+        width: 30px;
+        height: 30px;
+        font-size: 13.5px;
+        flex-shrink: 0;
     }
     .trh-brand-title {
         white-space: nowrap;
-        font-size: 14px;
+        font-size: 13.5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .trh-env-pills {
-        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .trh-env-pill {
+        font-size: 10px;
+        padding: 0 5px;
     }
     .trh-topbar-actions {
-        justify-content: flex-start;
-        flex-wrap: wrap;
-        width: 100%;
-    }
-    .trh-url-bar {
-        padding: 4px 6px 4px 10px;
         gap: 6px;
+        flex-shrink: 0;
     }
-    .trh-url-bar .trh-btn {
-        padding: 6px 9px;
+    .trh-topbar-actions .trh-btn {
+        padding: 5px 8px;
         font-size: 12px;
     }
+    .trh-topbar-actions .trh-btn-icon {
+        width: 30px;
+        height: 30px;
+    }
+    .trh-url-bar {
+        grid-column: 1 / -1;
+        order: 3;
+        padding: 3px 5px 3px 10px;
+        gap: 6px;
+    }
+    .trh-url-input {
+        font-size: 12.5px;
+        padding: 4px 2px;
+    }
+    .trh-url-bar .trh-btn {
+        padding: 5px 9px;
+        font-size: 12px;
+    }
+    .trh-settings-popover {
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
+
+    /* 主体：分类横栏 + 全高资源画廊（底部抽屉按需弹出） */
     .trh-workspace-body {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr auto;
+        position: relative;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
     }
     .trh-nav-rail {
         flex-direction: row;
         overflow-x: auto;
-        padding: 8px 12px;
+        padding: 7px 12px;
+        gap: 6px;
         border-right: none;
         border-bottom: 1px solid var(--trh-border);
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .trh-nav-rail::-webkit-scrollbar {
+        display: none;
     }
     .trh-nav-section-title,
     .trh-nav-active-card {
@@ -1145,21 +1179,136 @@
     .trh-nav-item {
         width: auto;
         flex-shrink: 0;
-        padding: 7px 12px;
+        padding: 6px 11px;
+        font-size: 12.5px;
+        gap: 7px;
     }
+
+    /* 搜索与横向单行筛选胶囊 */
     .trh-stage-toolbar {
-        padding: 10px 14px;
+        padding: 9px 12px;
+        gap: 8px;
     }
     .trh-search-box {
         width: 100%;
+        padding: 5px 10px;
     }
+    .trh-filter-pills {
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .trh-filter-pills::-webkit-scrollbar {
+        display: none;
+    }
+    .trh-filter-pill {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+
     .trh-stage-content {
-        padding: 12px 14px;
+        padding: 12px;
+        padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* 移动端按需弹出的底部详情抽屉 (Bottom Sheet) */
+    .trh-mobile-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(7, 9, 15, 0.68);
+        backdrop-filter: blur(2px);
+        z-index: 35;
     }
     .trh-inspector {
+        display: none;
+    }
+    .trh-inspector.is-mobile-open {
+        display: flex;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 80dvh;
         border-left: none;
         border-top: 1px solid var(--trh-border-strong);
-        max-height: 44vh;
-        padding: 14px;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -14px 38px rgba(0, 0, 0, 0.75);
+        padding: 14px 15px calc(16px + env(safe-area-inset-bottom, 0px));
+        z-index: 40;
+    }
+    .trh-mobile-sheet-close {
+        display: inline-flex;
+    }
+    .trh-staged-footer {
+        bottom: calc(-16px - env(safe-area-inset-bottom, 0px));
+        margin: 0 -15px calc(-16px - env(safe-area-inset-bottom, 0px)) -15px;
+        padding: 10px 15px calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+@media (max-width: 600px) {
+    /* 手机端角色卡采用双列紧凑网格，同屏可浏览 4~6 张角色卡 */
+    .trh-character-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .trh-char-portrait {
+        aspect-ratio: 16 / 11;
+    }
+    .trh-char-top-badges {
+        top: 6px;
+        left: 6px;
+        right: 6px;
+        gap: 4px;
+    }
+    .trh-char-body {
+        padding: 9px 10px;
+        gap: 6px;
+    }
+    .trh-char-name {
+        font-size: 13px;
+    }
+    .trh-char-meta {
+        gap: 4px;
+        min-height: 18px;
+    }
+    .trh-char-footer {
+        padding-top: 6px;
+        font-size: 11px;
+    }
+    .trh-char-footer .trh-btn-xs {
+        padding: 3px 7px;
+        font-size: 11px;
+    }
+
+    /* 手机端预设/世界书列表行：操作按钮独立成底栏，避免挤压标题 */
+    .trh-resource-row {
+        flex-wrap: wrap;
+        padding: 11px 12px;
+        gap: 10px;
+    }
+    .trh-row-icon {
+        width: 34px;
+        height: 34px;
+    }
+    .trh-row-main {
+        flex: 1 1 calc(100% - 48px);
+    }
+    .trh-row-actions {
+        width: 100%;
+        justify-content: flex-end;
+        padding-top: 7px;
+        border-top: 1px solid var(--trh-border);
+    }
+}
+
+@media (max-width: 340px) {
+    .trh-character-grid {
+        grid-template-columns: 1fr;
     }
 }

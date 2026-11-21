@@ -512,12 +512,17 @@ try {
 
     assert.equal(exceptions.length, 0, `页面初始化异常: ${JSON.stringify(exceptions)}`);
 
-    // 1. 验证设置区启动卡与魔法棒入口挂载成功
-    const mounted = await evaluate(`[
-        Boolean(document.getElementById('tavern_resource_hub_launcher')),
-        Boolean(document.getElementById('tavern_resource_hub_wand_item'))
-    ]`);
-    assert.deepEqual(mounted, [true, true]);
+    // 1. 验证原生抽屉入口与魔法棒菜单入口挂载成功且名称精简为“资源管理器”
+    const mounted = await evaluate(`({
+        hasDrawer: Boolean(document.querySelector('#tavern_resource_hub_launcher .inline-drawer')),
+        drawerTitle: document.querySelector('#tavern_resource_hub_launcher .inline-drawer-header b')?.textContent || '',
+        wandLabel: document.querySelector('#tavern_resource_hub_wand_button span')?.textContent || '',
+    })`);
+    assert.deepEqual(mounted, {
+        hasDrawer: true,
+        drawerTitle: '资源管理器',
+        wandLabel: '资源管理器',
+    });
 
     // 2. 点击打开独立全屏管理器
     await evaluate(`document.getElementById('trh_open_workspace_btn').click(); new Promise(r => setTimeout(r, 150))`);
@@ -584,15 +589,34 @@ try {
         hasRollbackBanner: true,
     });
 
-    // 5. 切换至对话预设视图与移动端尺寸验证响应式布局
-    await evaluate(`document.querySelector('.trh-nav-item[data-tab="preset"]').click(); new Promise(r => setTimeout(r, 100))`);
+    // 5. 切换至移动端尺寸 (390x844) 验证双列角色卡网格、预设列表与按需底部抽屉 (Bottom Sheet)
     await cdp('Emulation.setDeviceMetricsOverride', {
         width: 390,
         height: 844,
         deviceScaleFactor: 2,
         mobile: true,
     }, sessionId);
-    await new Promise(r => setTimeout(r, 120));
+    await evaluate(`document.querySelector('.trh-nav-item[data-tab="character"]').click(); new Promise(r => setTimeout(r, 120))`);
+
+    const mobileInitialState = await evaluate(`({
+        inspectorDisplay: getComputedStyle(document.querySelector('.trh-inspector')).display,
+        horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+    })`);
+    assert.equal(mobileInitialState.inspectorDisplay, 'none', '移动端默认不遮挡主画廊列表');
+    assert.equal(mobileInitialState.horizontalOverflow, false, '移动端无横向溢出');
+    await captureScreenshot('trh-characters-mobile.png');
+
+    // 点击第一张角色卡弹出底部详情抽屉
+    await evaluate(`document.querySelector('.trh-char-card').click(); new Promise(r => setTimeout(r, 120))`);
+    const mobileSheetOpen = await evaluate(`getComputedStyle(document.querySelector('.trh-inspector')).display`);
+    assert.equal(mobileSheetOpen, 'flex', '点击角色卡后弹出移动端底部详情抽屉');
+    await captureScreenshot('trh-mobile-sheet.png');
+
+    // 点击“收起详情”关闭底部抽屉，再切换到预设选项卡
+    await evaluate(`document.querySelector('.trh-mobile-sheet-close').click(); new Promise(r => setTimeout(r, 100))`);
+    assert.equal(await evaluate(`getComputedStyle(document.querySelector('.trh-inspector')).display`), 'none');
+
+    await evaluate(`document.querySelector('.trh-nav-item[data-tab="preset"]').click(); new Promise(r => setTimeout(r, 120))`);
     await captureScreenshot('trh-presets-mobile.png');
 
     // 6. 验证 dispose 生命周期完整清理

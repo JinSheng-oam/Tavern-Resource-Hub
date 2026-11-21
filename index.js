@@ -24,13 +24,13 @@ function getContext() {
 
 function updateLauncherSummary() {
     if (!launcherEl || !store) return;
-    const sub = launcherEl.querySelector('.trh-launcher-sub');
+    const sub = launcherEl.querySelector('.trh-drawer-status');
     if (!sub) return;
     const boundCount = store.listBoundResources().length;
     const updateCount = store.listBoundResources().filter(b => b.hasUpdate).length;
     sub.textContent = updateCount > 0
         ? `已绑定 ${boundCount} 个更新源 · 发现 ${updateCount} 个可更新版本`
-        : `集成管理角色卡、预设与世界书 · 已绑定 ${boundCount} 个链接更新源`;
+        : `已绑定 ${boundCount} 个链接更新源`;
 }
 
 function mountSettingsLauncher() {
@@ -40,37 +40,61 @@ function mountSettingsLauncher() {
 
     launcherEl = document.createElement('section');
     launcherEl.id = LAUNCHER_ID;
-    launcherEl.className = 'trh-launcher-card';
+    launcherEl.className = 'extension_container';
 
-    const info = document.createElement('div');
-    info.className = 'trh-launcher-info';
+    const drawer = document.createElement('div');
+    drawer.className = 'inline-drawer';
 
-    const title = document.createElement('div');
-    title.className = 'trh-launcher-title';
-    const icon = document.createElement('i');
-    icon.className = 'fa-solid fa-cubes';
-    const titleText = document.createElement('span');
-    titleText.textContent = '典藏工坊 · 资源管理器 (预设 / 角色卡 / 世界书)';
-    title.append(icon, titleText);
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'inline-drawer-toggle inline-drawer-header';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', 'tavern_resource_hub_drawer_content');
 
-    const sub = document.createElement('div');
-    sub.className = 'trh-launcher-sub';
-    info.append(title, sub);
+    const titleBold = document.createElement('b');
+    titleBold.textContent = '资源管理器';
+
+    const chevron = document.createElement('span');
+    chevron.className = 'fa-solid fa-circle-chevron-down inline-drawer-icon down';
+    chevron.setAttribute('aria-hidden', 'true');
+
+    toggle.append(titleBold, chevron);
+    // 展开/收起显示由酒馆宿主委托 .inline-drawer-toggle 处理，此处仅同步 aria-expanded
+    toggle.addEventListener('click', () => {
+        toggle.setAttribute('aria-expanded', String(toggle.getAttribute('aria-expanded') !== 'true'));
+    });
+
+    const content = document.createElement('div');
+    content.id = 'tavern_resource_hub_drawer_content';
+    content.className = 'inline-drawer-content';
+
+    const body = document.createElement('div');
+    body.className = 'trh-drawer-body';
+
+    const status = document.createElement('div');
+    status.className = 'trh-drawer-status';
+
+    const actions = document.createElement('div');
+    actions.className = 'trh-drawer-actions';
 
     const openBtn = document.createElement('button');
     openBtn.type = 'button';
     openBtn.id = 'trh_open_workspace_btn';
-    openBtn.className = 'trh-launcher-open-btn';
+    openBtn.className = 'menu_button';
     const btnIcon = document.createElement('i');
     btnIcon.className = 'fa-solid fa-up-right-from-square';
     const btnLabel = document.createElement('span');
-    btnLabel.textContent = '打开全屏管理器';
+    btnLabel.textContent = '打开资源管理器';
     openBtn.append(btnIcon, btnLabel);
     openBtn.addEventListener('click', () => {
         workspace?.open();
     });
 
-    launcherEl.append(info, openBtn);
+    actions.append(openBtn);
+    body.append(status, actions);
+    content.append(body);
+    drawer.append(toggle, content);
+    launcherEl.append(drawer);
     anchor.append(launcherEl);
     updateLauncherSummary();
 }
@@ -87,7 +111,7 @@ function mountWandMenuEntry() {
     const btn = document.createElement('div');
     btn.id = 'tavern_resource_hub_wand_button';
     btn.className = 'list-group-item flex-container flexGap10 interactable';
-    btn.title = '打开预设·角色卡·世界书管理器';
+    btn.title = '打开资源管理器';
     btn.style.cursor = 'pointer';
 
     const icon = document.createElement('i');
@@ -95,7 +119,7 @@ function mountWandMenuEntry() {
     icon.style.color = '#F5A524';
 
     const label = document.createElement('span');
-    label.textContent = '资源管理器 (预设·角色卡·世界书)';
+    label.textContent = '资源管理器';
 
     btn.append(icon, label);
     btn.addEventListener('click', (e) => {

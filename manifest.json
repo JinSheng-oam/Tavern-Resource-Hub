@@ -1,6 +1,6 @@
 {
   "name": "Tavern Resource Hub",
-  "display_name": "典藏工坊 · 资源管理器 (预设·角色卡·世界书)",
+  "display_name": "资源管理器",
   "author": "Jin",
   "version": "1.0.0",
   "loading_order": 15,
